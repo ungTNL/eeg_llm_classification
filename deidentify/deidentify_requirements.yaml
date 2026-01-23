@@ -1,0 +1,17 @@
+name: deidentify
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+  - https://repo.anaconda.com/pkgs/main
+  - https://repo.anaconda.com/pkgs/r
+dependencies:
+  - python=3.9
+  - chardet
+  - nltk
+  - numpy
+  - pandas
+  - xmltodict
+  - pathlib
+  - openpyxl
+prefix: /opt/anaconda3/envs/deidentify
