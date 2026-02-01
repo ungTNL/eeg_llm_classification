@@ -4,19 +4,12 @@ import pandas as pd
 import numpy as np
 import subprocess
 import threading
+import argparse
 
-#### CHECK INPUT ARGUMENTS
-if len(sys.argv) == 2:
-    spreadsheet = sys.argv[1]
-    num_batches = 4
-    print(f"Deidentifying notes in '{spreadsheet}'\n BATCHES: {num_batches}")
-elif len(sys.argv) > 2:
-    spreadsheet  = sys.argv[1]
-    num_batches = int(sys.argv[2])
-    print(f"Deidentifying notes in '{spreadsheet}'\n BATCHES: {num_batches}")
-else:
-    print("No spreadsheet provided.")
-    sys.exit(1)
+parser = argparse.ArgumentParser()
+parser.add_argument("-f", "--file", type=str, default="../deidentify/EEG_PHI_removed.xlsx", help="Input spreadsheet file name")
+parser.add_argument("-n","--num_batch", type=int, default=4, help="Input number of batches")
+args = parser.parse_args()
 
 #### CHECK IF PHILTER-UCSF IS AVAILABLE
 cmd = """
@@ -51,7 +44,7 @@ else:
 
 #### EXTRACT NOTES WITH PHI
 # Read in .xlsx file into a DataFrame
-df = pd.read_excel(spreadsheet)
+df = pd.read_excel(args.file)
 df.columns = df.columns.str.lower()
 
 # update data types
@@ -84,7 +77,11 @@ def process_note(g):
     # check for starter words
     WORDS = ["conditions of the recording", 
              "recording method", 
-             "technique"]
+             "technique",
+             "findings",
+             "impression",
+             "summary of findings",
+             "summary"]
     for w in WORDS:
         start = full_text.lower().find(w)
         if start >= 0:
@@ -119,7 +116,7 @@ INPUT_ROOT.mkdir(parents=True, exist_ok=True)
 batch_dirs = [
     (INPUT_ROOT/ f"notes_batch_{i+1}").mkdir(exist_ok=True) or
     (INPUT_ROOT / f"notes_batch_{i+1}")
-    for i in range(num_batches)
+    for i in range(args.num_batch)
 ]
 
 OUTPUT_ROOT = PROJECT_ROOT / "notes_processed_txt"
@@ -132,7 +129,7 @@ note_ids = df_merged["note_id"].to_numpy()
 texts = df_merged["note_text"].to_numpy()
 
 # evenly split into  batches
-batch_indices = np.array_split(np.arange(len(note_ids)), num_batches)
+batch_indices = np.array_split(np.arange(len(note_ids)), args.num_batch)
 
 # export as .txt
 for batch_idx, indices in enumerate(batch_indices):
@@ -153,7 +150,7 @@ def stream_process_output(process, batch_name):
             print(f"[{batch_name}] {line.strip()}")
     process.stdout.close()
 
-print(f"Launching {num_batches} batch jobs...")    
+print(f"Launching {args.num_batch} batch jobs...")    
 for batch_dir in sorted(INPUT_ROOT.glob("notes_batch_*")):
     batch_name = batch_dir.name  # e.g. notes_batch_1
     batch_log_dir = INPUT_ROOT / batch_name

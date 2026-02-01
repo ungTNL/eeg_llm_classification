@@ -1,15 +1,12 @@
-# use deidentify environment
 import pandas as pd
 import textwrap
 from pathlib import Path
 import sys
+import argparse
 
-# access input variable for spreadsheet to be labeled
-if len(sys.argv) == 2:
-    fn= sys.argv[1]
-    print(f"Deidentifying notes in '{spreadsheet}'\n BATCHES: {num_batches}")
-elif len(sys.argv) == 1:
-    fn = '../deidentify/EEG_PHI_removed.xlsx'
+parser = argparse.ArgumentParser()
+parser.add_argument("-f", "--file", type=str, default="../deidentify/EEG_PHI_removed.xlsx", help="Input spreadsheet file name")
+args = parser.parse_args()
 
 WRAP_WIDTH = 100
 SAMPLE_SIZE = 1000
@@ -37,7 +34,7 @@ def get_binary_label(prompt: str) -> int:
 # ------------------------
 # Load data
 # ------------------------
-df = pd.read_excel(fn)
+df = pd.read_excel(args.file)
 print("Unique entries:\n", df.nunique(), "\n")
 
 # Fixed random subset

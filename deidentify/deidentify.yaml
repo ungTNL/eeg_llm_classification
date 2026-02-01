@@ -14,4 +14,3 @@ dependencies:
   - xmltodict
   - pathlib
   - openpyxl
-prefix: /opt/anaconda3/envs/deidentify
