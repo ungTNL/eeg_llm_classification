@@ -8,6 +8,7 @@ from tqdm import tqdm
 tqdm.pandas()
 from pydantic import BaseModel
 import argparse
+import sys
 
 # INPUT ARGUMENTS
 parser = argparse.ArgumentParser()
@@ -22,19 +23,14 @@ df_merged.columns = df_merged.columns.str.lower()
 # ClASSES for output
 class Report(BaseModel):
   seizure_label: bool | None
-  seizure_confidence: float | None
-  seizure_text: str | None
   SE_label: bool | None
-  SE_confidence: float | None
+  SE_text: str | None
   SE_text: str | None
   ED_label: bool | None
-  ED_confidence: float | None
   ED_text: str | None
   NCSE_label: bool | None
-  NCSE_confidence: float | None
   NCSE_text: str | None
   EMU_label: str | None
-  EMU_confidence: float | None
   EMU_text: str | None
   StudyNumber: str | None   
 
@@ -45,7 +41,7 @@ client = ollama.Client()
 # === CONFIG ===
 OUTPUT_DIR = args.output_dir
 MODEL = args.model    # set to your model identifier
-BATCH_SIZE = 16         # tune: 8, 16, 32 ...
+BATCH_SIZE = 5         # tune: 8, 16, 32 ...
 CHECKPOINT_EVERY = 50           # checkpoint every N batches
 FINAL_XLSX = f"{OUTPUT_DIR}/classified_{MODEL}.xlsx"
 OUTPUT_CHECKPOINT = f"{OUTPUT_DIR}/checkpoint_{MODEL}.csv"
@@ -56,24 +52,31 @@ RETRY = 1
 SCHEMA = ReportList.model_json_schema()
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
+# Check for interactive session
+is_tty = sys.stderr.isatty()
+
+tqdm_kwargs = dict(
+    file=sys.stderr,
+    ascii=not is_tty,          # safer in logs
+    dynamic_ncols=is_tty,      # only useful in terminals
+    leave=not is_tty,          # keep final line in logs
+    mininterval=240, 
+    miniters=100
+)
+
 PROMPT = (
 """You are a strict medical document classifier. For each report below, return exactly one JSON object between <JSON> and </JSON>. 
 
 Schema (exact keys):
 - seizure_label: boolean - true/false
-- seizure_confidence: float - number between 0.0 and 1.0
-- seizure_text: string - short verbatim excerpt
+- seizure_text: string - short excerpt
 - SE_label: boolean - true/false
-- SE_confidence: float - number between 0.0 and 1.0
 - SE_text: string - short excerpt
 - ED_label: boolean - true/false
-- ED_confidence: float - number between 0.0 and 1.0
 - ED_text: string - short excerpt
 - NCSE_label: boolean - true/false
-- NCSE_confidence: float - number between 0.0 and 1.0
 - NCSE_text: string - short excerpt
 - EMU_label: string - "Phase 1", "Phase 2", or "None"
-- EMU_confidence: float - number between 0.0 and 1.0
 - EMU_text: string - short excerpt
 - StudyNumber: string - study number or "None", typically of format "12-3456" or "None"
 
@@ -83,8 +86,7 @@ Rules:
 - ED_label: true only for explicit mentions of epileptiform spikes, discharges, spike and slow waves, or sharp waves; negations => false.
 - NCSE_label: true only for explicit phrases like "nonconvulsive status epilepticus"; negations => false.
 - If no seizures, then SE and NCSE must be false.
-- *_confidence: numeric certainty between 0 (no certainty) or 1 (absolute certainty).
-- *_text: verbatim excerpt.
+- *_text: verbatim excerpt (less than 10 words).
 - EMU_label: "Phase 1" = EMU scalp EEG monitoring; "Phase 2" = intracranial/pre‑surgical; "None" = all other EEGs.
 - StudyNumber: return if present, else "None".
 
@@ -180,7 +182,7 @@ remaining = len(rows_to_process)    # how many left
 
 # Step 3: Progress bar with resume
 results_buffer = []
-with tqdm(total=total_rows, initial=already_done, desc="Rows") as pbar:
+with tqdm(total=total_rows, initial=already_done, desc="Rows", **tqdm_kwargs) as pbar:
     for i in range(0, remaining, BATCH_SIZE):
         batch = rows_to_process[i:i+BATCH_SIZE]
         reports = [r.get("note_text", "") for r in batch]

@@ -52,10 +52,10 @@ curl -fsSL https://ollama.com/download/ollama-linux-amd64.tar.zst \
   | tar x -C $HOME/$USER/.local
 ```
 
-The batch job specifies ```OLLAMA_HOME,``` which is where your models will be stored. However, you can manually configure it to lustre, where there is more storage by putting this in ```~/.bash_profile```:
+The batch job specifies ```OLLAMA_MODELS,``` which is where your models will be stored. However, you can manually configure it to lustre, where there is more storage by putting this in ```~/.bash_profile```:
 
 ```bash
-export OLLAMA_HOME="export OLLAMA_HOME="/expanse/lustre/scratch/$USER/temp_project/.ollama"
+export OLLAMA_HOME="export OLLAMA_MODELS="/expanse/lustre/scratch/$USER/temp_project/.ollama/models"
 ```
 
 Before running the batch script, be sure to export the ```$INPUT_FILE```, ollama ```$MODEL```, and ```$SCRIPT``` that you are using to classify. If ```$MODEL``` is unspecified, llama3 will run. ```$INPUT_FILE``` and ```$SCRIPT``` are required.

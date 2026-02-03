@@ -1,0 +1,23 @@
+# hidden files, compiled bytecode
+*.DS_Store
+*__pycache__/*
+*.ipynb_checkpoints/*
+
+# Unresolved methods
+llama-cpp/
+dead-ends/
+
+# Potential PHI: input, output, & checkpoint files
+data/
+results/
+*.xlsx
+*.xlsx.csv
+
+# Repos, models
+deidentify/philter-ucsf/
+*hf_models*
+*OllamaToGGUF*
+
+# Helper & test scripts (not final versions)
+*.ipynb
+

@@ -31,6 +31,21 @@ def get_binary_label(prompt: str) -> int:
             return int(val)
         print("Invalid input. Please enter 0, 1, or q.")
 
+def get_modifier_label(prompt: str) -> str:
+    """
+    Prompt user for a modifier label ('mild', 'moderate', or 'severe') or quit (q).
+    Returns string
+    Exits program cleanly on 'q'.
+    """
+    while True:
+        val = input(f"{prompt} ('mild', 'mild-moderate', 'moderate', 'moderate-severe', 'severe', 'unknown', or q to quit): ").strip().lower()
+        if val == "q":
+            print("\n[Quitting — progress saved.]\n")
+            sys.exit(0)
+        if val in {"mild", "moderate", "severe", "mild-moderate", "moderate-severe", "unknown"}:
+            return val
+        print("Invalid input. Please enter 'mild', 'moderate', 'severe','mild-moderate', 'moderate-severe', 'unknown' or q.")
+
 # ------------------------
 # Load data
 # ------------------------
@@ -50,10 +65,19 @@ if CHECKPOINT_PATH.exists():
 else:
     labels_df = pd.DataFrame(columns=[
         "note_id",
-        "seizure",
-        "status_epilepticus",
-        "epileptiform_discharges",
+        "SZ",
+        "clinical_SZ",
+        "nonclinical_SZ",
+        "nonconvulsive_SZ",
+        "focal_onset_SZ",        
+        "SE",
         "NCSE",
+        "CSE",
+        "epileptiform_discharges",
+        "dominant_freq",
+        "diffuse_nonspecific_abnormalities",
+        "diffuse_nonspecific_abnormalities_modifier",
+        "focal_slowing",
     ])
     print("No checkpoint found. Starting fresh.\n")
 
@@ -69,26 +93,56 @@ for _, row in v_set.iterrows():
     if note_id in labeled_ids:
         continue
 
-    note_text = row["note_text"]
+    # note_text = row["note_text"]
+    note_text = "" if pd.isna(row.get("note_text")) else str(row.get("note_text"))
     wrapped_text = textwrap.fill(note_text, width=WRAP_WIDTH)
 
     current = len(labeled_ids) + 1
     print(f"\nValidation {current}/{total}")
     print(f"{note_id}:\n{wrapped_text}\n")
 
-    seizure = get_binary_label("Presence of seizure")
-    status_epilepticus = get_binary_label("Status epilepticus")
-    epileptiform = get_binary_label(
+    SZ = get_binary_label("Presence of seizure")
+    if SZ == 0:
+        clinical_SZ = \
+        nonclinical_SZ = \
+        nonconvulsive_SZ = \
+        focal_onset_SZ = \
+        SE = \
+        NCSE = \
+        CSE = 0
+        print("Marking all seizure-related labels as 0 since no seizure present. \n")
+    else:
+        clinical_SZ = get_binary_label("Clinical seizure?")
+        nonclinical_SZ = get_binary_label("Nonclinical seizure")
+        nonconvulsive_SZ = get_binary_label("Nonconvulsive seizure")
+        focal_onset_SZ = get_binary_label("Focal onset seizure")
+        SE = get_binary_label("Status epilepticus")
+        NCSE = get_binary_label("Nonconvulsive status epilepticus")
+        CSE = get_binary_label("Convulsive status epileptius")
+    epileptiform_discharges = get_binary_label(
         "Epileptiform spikes, discharges, spike-and-slow waves, or sharp waves"
     )
-    ncse = get_binary_label("Nonconvulsive status epilepticus")
+    dominant_freq = input("Dominant Frequencies: ")
+    diffuse_nonspecific_abnormalities = get_binary_label("Diffuse nonspecific abnormalities")
+    if diffuse_nonspecific_abnormalities == 1:
+        diffuse_nonspecific_abnormalities_modifier = get_modifier_label("Diffuse nonspecific abnormalities modifier")
+    focal_slowing = get_binary_label("Focal slowing")
 
     new_row = {
         "note_id": note_id,
-        "seizure": bool(seizure),
-        "status_epilepticus": bool(status_epilepticus),
-        "epileptiform_discharges": bool(epileptiform),
-        "NCSE": bool(ncse),
+        "SZ": bool(SZ),
+        "clinical_SZ": bool(clinical_SZ),
+        "nonclinical_SZ": bool(nonclinical_SZ),
+        "nonconvulsive_SZ": bool(nonconvulsive_SZ),
+        "focal_onset_SZ": bool(focal_onset_SZ),
+        "SE": bool(SE),
+        "NCSE": bool(NCSE),
+        "CSE": bool(CSE),
+        "epileptiform_discharges": bool(epileptiform_discharges),
+        "dominant_freq": str(dominant_freq),
+        "diffuse_nonspecific_abnormalities": bool(diffuse_nonspecific_abnormalities),
+        "diffuse_nonspecific_abnormalities_modifier": str(diffuse_nonspecific_abnormalities_modifier),
+        "focal_slowing": bool(focal_slowing)
     }
 
     labels_df = pd.concat(

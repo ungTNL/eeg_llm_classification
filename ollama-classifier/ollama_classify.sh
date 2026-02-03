@@ -31,8 +31,10 @@ echo "SCRIPT=${SCRIPT-<unset>}"
 
 # Load Modules
 module purge
+module load gpu
+module load slurm
 
-echo "Modules purged"
+echo "Modules purged & gpu + slurm loaded"
 
 # ---- Load Python/conda environment ----
 source "$HOME/miniconda3/etc/profile.d/conda.sh"
@@ -42,11 +44,13 @@ echo "Conda environment activated"
 
 # ---- add ollama binary to path & start server ----
 export PATH="$HOME/.local/bin:$PATH"
-export OLLAMA_HOME="/expanse/lustre/scratch/$USER/temp_project/.ollama"
+export OLLAMA_MODELS="/expanse/lustre/scratch/$USER/temp_project/.ollama/models"
+mkdir -p $OLLAMA_MODELS
 
-echo "Updated Ollama home directory"
+echo "Updated Ollama's MODELS directory"
 
-ollama serve &
+export OLLAMA_CONTEXT_LENGTH=16384
+ollama serve > logs/ollama_serve.log &
 OLLAMA_PID=$!
 MAX_WAIT=30
 WAITED=0
@@ -69,15 +73,14 @@ ollama list | grep -q "$MODEL" || ollama pull "$MODEL"
 
 echo "Found/Downloaded model: $MODEL"
 
-# Disable tqdm file locking, manage max threads
-export TQDM_DISABLE=1
+# Manage max threads
 export OMP_NUM_THREADS=8
 
 # ---- Define paths ----
 SCRATCH_DIR="/scratch/$USER/job_$SLURM_JOB_ID"
-LUSTRE_DIR="expanse/lustre/scratch/$USER/temp_project/results"
+LUSTRE_DIR="/expanse/lustre/scratch/$USER/temp_project/ollama/results"
 mkdir -p "$SCRATCH_DIR"
-mkdir -p "$LUSRE_DIR"
+mkdir -p "$LUSTRE_DIR"
 
 echo "Running inferencing script"
 
@@ -86,6 +89,8 @@ python3 -u "$SCRIPT" \
     --output_dir "$LUSTRE_DIR" \
     --input "$INPUT_FILE" \
     --model "$MODEL"
+
+ollama ps
 
 # ---- Copy results to Home ----
 mkdir -p "$HOME/eeg_llm_classification"
