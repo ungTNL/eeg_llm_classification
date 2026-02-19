@@ -122,10 +122,12 @@ for _, row in v_set.iterrows():
     epileptiform_discharges = get_binary_label(
         "Epileptiform spikes, discharges, spike-and-slow waves, or sharp waves"
     )
-    dominant_freq = input("Dominant Frequencies: ")
+    # dominant_freq = input("Dominant Frequencies: ")
     diffuse_nonspecific_abnormalities = get_binary_label("Diffuse nonspecific abnormalities")
     if diffuse_nonspecific_abnormalities == 1:
         diffuse_nonspecific_abnormalities_modifier = get_modifier_label("Diffuse nonspecific abnormalities modifier")
+    else:
+        diffuse_nonspecific_abnormalities_modifier = ""
     focal_slowing = get_binary_label("Focal slowing")
 
     new_row = {
@@ -139,7 +141,7 @@ for _, row in v_set.iterrows():
         "NCSE": bool(NCSE),
         "CSE": bool(CSE),
         "epileptiform_discharges": bool(epileptiform_discharges),
-        "dominant_freq": str(dominant_freq),
+        # "dominant_freq": str(dominant_freq),
         "diffuse_nonspecific_abnormalities": bool(diffuse_nonspecific_abnormalities),
         "diffuse_nonspecific_abnormalities_modifier": str(diffuse_nonspecific_abnormalities_modifier),
         "focal_slowing": bool(focal_slowing)
