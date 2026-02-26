@@ -16,7 +16,9 @@ Then, execute the python script followed by the spreadsheet containing the clini
 python3 deidentify.py -f path/to/spreadsheet.xlsx -n 4
 ```
 
-If unspecified, the script will execute deidentification as 4 parallel batch jobs.
+This will filter out non-EEG clinical nodes, chop the header with PHI, then run Philter-UCSF to remove any additional sensitive information. If ```-n``` is unspecified, the script will execute Philter-UCSF as 4 parallel batch jobs.
+
+Optional flag ```--include_PHI``` with not run Philter-UCSF, and ```--max_chop``` will maximally reduce the EEG notes to the 'impression' or 'summary of findings' sections, if present.
 
 
 ## ollama-classifier/

@@ -14,36 +14,6 @@ parser.add_argument("--max_chop",action='store_true', help="Reduce the clinical 
 parser.add_argument("--time_filter",action='store_true', help="Only include records from 2/12/24-2/12/26")
 args = parser.parse_args()
 
-#### CHECK IF PHILTER-UCSF IS AVAILABLE
-cmd = """
-if [ -d 'philter-ucsf' ]; then
-    echo 'philter-ucsf already  exists.'
-else
-    echo 'philter-ucsf does not exist. Cloning Repo.'
-    git clone https://github.com/BCHSI/philter-ucsf.git
-fi
-"""
-
-subprocess.run(cmd,shell=True)
-# Check Python version
-assert sys.version_info[:2] <= (3, 10), f"Philter incompatible with Python {sys.version}"
-
-#### CHECK IF NLTK ENG DOWNLOAD IS AVAILABLE
-import nltk
-def is_tagger_downloaded():
-    print("Checking for NLTK tagger.")
-    try:
-        nltk.data.find('taggers/averaged_perceptron_tagger_eng')
-        return True
-    except LookupError:
-        return False
-
-if is_tagger_downloaded():
-    print('NLTK tagger already exists.')
-else: 
-    print('NLTK tagger does not exist. Downloading.')
-    nltk.download('averaged_perceptron_tagger_eng')
-
 
 #### EXTRACT NOTES WITH PHI
 # Read in .xlsx file into a DataFrame
@@ -148,6 +118,36 @@ if args.include_PHI:
     print(f"Saved clinical notes with PHI included as '{filename}'.")
 else:
     ####  RUN PHILTER-UCSF
+    #### CHECK IF PHILTER-UCSF IS AVAILABLE
+    cmd = """
+    if [ -d 'philter-ucsf' ]; then
+        echo 'philter-ucsf already  exists.'
+    else
+        echo 'philter-ucsf does not exist. Cloning Repo.'
+        git clone https://github.com/BCHSI/philter-ucsf.git
+    fi
+    """
+
+    subprocess.run(cmd,shell=True)
+    # Check Python version
+    assert sys.version_info[:2] <= (3, 10), f"Philter incompatible with Python {sys.version}"
+
+    #### CHECK IF NLTK ENG DOWNLOAD IS AVAILABLE
+    import nltk
+    def is_tagger_downloaded():
+        print("Checking for NLTK tagger.")
+        try:
+            nltk.data.find('taggers/averaged_perceptron_tagger_eng')
+            return True
+        except LookupError:
+            return False
+
+    if is_tagger_downloaded():
+        print('NLTK tagger already exists.')
+    else: 
+        print('NLTK tagger does not exist. Downloading.')
+        nltk.download('averaged_perceptron_tagger_eng')
+
     # Define and Create Directories
     PROJECT_ROOT = Path(__file__).resolve().parent
     PHILTER_ROOT = PROJECT_ROOT / "philter-ucsf"
