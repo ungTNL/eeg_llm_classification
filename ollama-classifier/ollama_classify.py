@@ -53,7 +53,7 @@ FEATURES: List[Dict[str, str]] = [
     {"key": "ncse", "desc": "true only for explicit phrases like 'nonconvulsive status epilepticus'; negations => false"},
     {"key": "epileptiform_discharges", "desc": "true only for explicit mentions of epileptiform spikes, discharges, spike and slow waves, or sharp waves; negations => false."},
     {"key": "diffuse_nonspecific_abnormalities", "desc": "true for generalized, widespread patterns of slowed brain waves, usually mentioned as 'generalized background slowing' or 'diffuse nonspecific abnormalities'."},
-    {"key": "focal_slowing", "desc": "true only for ecplicit mentions of focal slowing or focal dysfunction."},
+    {"key": "focal_slowing", "desc": "true only for explicit mentions of focal slowing or focal dysfunction."},
 ]
 
 # Default generation options (tweak as needed)

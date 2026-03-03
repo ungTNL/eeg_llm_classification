@@ -1,24 +1,24 @@
 # eeg_llm_classification
 tools for data de-identification, running the llm-classifier on SDSC, data-labeling &amp; manual validation, and performing clinical statistics.
 
-## deidentify/
-<span style="font-size: 18px;"> **deidentify.py**  <br></span>
+## preprocess/
+<span style="font-size: 18px;"> **preprocess.py**  <br></span>
 To run, build and create the conda environment from deidentify.yaml.
 
 ```bash
-conda env create -f deidentify.yaml
-conda activate deidentify
+conda env create -f preprocess.yaml
+conda activate preprocess
 ```
 
 Then, execute the python script followed by the spreadsheet containing the clinical notes and number of desired batches to run in parallel
 
 ```bash
-python3 deidentify.py -f path/to/spreadsheet.xlsx -n 4
+python3 preprocessy.py -i path/to/spreadsheet.xlsx -t 4
 ```
 
-This will filter out non-EEG clinical nodes, chop the header with PHI, then run Philter-UCSF to remove any additional sensitive information. If ```-n``` is unspecified, the script will execute Philter-UCSF as 4 parallel batch jobs.
+This will filter out non-EEG clinical nodes, chop the header with PHI, then run Philter-UCSF to remove any additional sensitive information. If ```-t``` is unspecified, the script will execute Philter-UCSF as 4 parallel threads.
 
-Optional flag ```--include_PHI``` with not run Philter-UCSF, and ```--max_chop``` will maximally reduce the EEG notes to the 'impression' or 'summary of findings' sections, if present.
+Optional flag ```--include_PHI``` with neither run Philter-UCSF nor remove the header, and ```--max_chop``` will maximally reduce the EEG notes to the 'impression' or 'summary of findings' sections, if present.
 
 
 ## ollama-classifier/
