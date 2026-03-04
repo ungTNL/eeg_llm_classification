@@ -75,8 +75,5 @@ sbatch --account=abc123 ollama_classify.sh
 ## validation/
 <span style="font-size: 18px;"> **label.py**  <br></span>
 
-Run the script with:
-```bash
-python3 label.py -f path/to/deidentified_spreadsheet.xlsx
-```
-Not specifying spreadsheet location will automatically check the path ```../deidentify/EEG_PHI_removed.xlsx```
+* sample.ipynb -> used to randomly subsample preprocessed EEG Notes for manual labeling on Qualtrics
+* qualtircs.ipynb -> used to do post-processing of Qualtrics survey output and some exploratory data analysis for accuracy metrics
