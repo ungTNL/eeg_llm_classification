@@ -79,5 +79,10 @@ sbatch --account=abc123 ollama_classify.sh
 ## validation/
 <span style="font-size: 18px;"> **label.py**  <br></span>
 
-* sample.ipynb -> used to randomly subsample preprocessed EEG Notes for manual labeling on Qualtrics
+* sample.py -> used to randomly subsample preprocessed EEG Notes for manual labeling on Qualtrics
+```--input```: input filename (.xlsx)
+```--output```: output directory & filename (.xlsx)
+```---size```: sample size, default=1000
+```--random_state```: default=42, try not to change for consistency
+
 * qualtrics.ipynb -> used to do post-processing of Qualtrics survey output and some exploratory data analysis for accuracy metrics

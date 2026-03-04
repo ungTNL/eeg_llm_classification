@@ -23,6 +23,5 @@ preprocess/philter-ucsf
 # Helper, test, debugging scripts (not final versions)
 *.ipynb
 !qualtrics.ipynb
-!sample.ipynb
 
 
