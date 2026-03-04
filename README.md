@@ -18,7 +18,11 @@ python3 preprocessy.py -i path/to/spreadsheet.xlsx -t 4
 
 This will filter out non-EEG clinical nodes, chop the header with PHI, then run Philter-UCSF to remove any additional sensitive information. If ```-t``` is unspecified, the script will execute Philter-UCSF as 4 parallel threads.
 
-Optional flag ```--include_PHI``` with neither run Philter-UCSF nor remove the header, and ```--max_chop``` will maximally reduce the EEG notes to the 'impression' or 'summary of findings' sections, if present.
+Optional flags:
+ ```--include_PHI```: will neither run Philter-UCSF nor remove the header 
+ ```--max_chop```: will maximally reduce the EEG notes to the 'impression' or 'summary of findings' sections, if present
+ ```--time_filter```: will only keep records in the past two years (specifically between '2024-02-12' and '2026-02-12)
+ ```-o```: specify output path & filename
 
 
 ## ollama-classifier/

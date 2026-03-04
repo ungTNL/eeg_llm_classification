@@ -48,8 +48,8 @@ from config import *
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--input", required=True, help="Input spreadsheet (.xlsx/.xls or .csv)")
-    ap.add_argument("--output_dir", default="results", help="Directory to write outputs")
+    ap.add_argument("--input", "-i", required=True, help="Input spreadsheet (.xlsx/.xls or .csv)")
+    ap.add_argument("--output_dir", "-o", default="results", help="Directory to write outputs")
     ap.add_argument("--db_path", default="results/results.sqlite", help="SQLite checkpoint DB path (e.g., results.sqlite)")
     ap.add_argument("--model", required=True, help="Ollama model name (e.g., llama3.2)")
     ap.add_argument("--prompt_version", default="v1", help="Bump when you change prompts/features behavior")

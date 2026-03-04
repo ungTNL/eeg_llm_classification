@@ -17,6 +17,7 @@ FEATURES: List[Dict[str, str]] = [
 
 # Default generation options (tweak as needed)
 DEFAULT_OPTIONS: Dict[str, Any] = {
+    "seed": 42,
     "temperature": 0.0,
     # "num_ctx": 8192,  # optional, if your model supports
 }
