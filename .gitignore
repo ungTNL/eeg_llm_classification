@@ -1,6 +1,6 @@
 # hidden files, compiled bytecode
 *.DS_Store
-*__pycache__/*
+*__pycache__*
 *.ipynb_checkpoints/*
 .vscode*
 

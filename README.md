@@ -64,7 +64,7 @@ Before running the batch script, be sure to export the ```$INPUT_FILE```, ollama
 ```bash
 export MODEL="llama3"
 export INPUT_FILE="/$HOME/$USER/eeg_llm_classification/EEG_PHI_REMOVED.xlsx"
-export SCRIPT="/home/$USER/eeg_llm_classification/scripts/ollama_classify.py"
+export SCRIPT="/home/$USER/eeg_llm_classification/scripts/main.py"
 ```
 
 And launch the job with sbatch. Account name can be found with ```sacctmgr show assoc user=$USER```
@@ -76,4 +76,4 @@ sbatch --account=abc123 ollama_classify.sh
 <span style="font-size: 18px;"> **label.py**  <br></span>
 
 * sample.ipynb -> used to randomly subsample preprocessed EEG Notes for manual labeling on Qualtrics
-* qualtircs.ipynb -> used to do post-processing of Qualtrics survey output and some exploratory data analysis for accuracy metrics
+* qualtrics.ipynb -> used to do post-processing of Qualtrics survey output and some exploratory data analysis for accuracy metrics
