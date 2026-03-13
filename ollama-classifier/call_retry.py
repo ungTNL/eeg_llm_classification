@@ -59,7 +59,7 @@ def infer_one_note_with_retries(
 ) -> Tuple[NoteLabels, str]:
     system_prompt = build_system_prompt(features)
     feature_keys = [f["key"] for f in features]
-    user_prompt = build_user_prompt(note_id, note_text, feature_keys)
+    user_prompt = build_user_prompt(note_text, feature_keys)
 
     t0 = time.time()
     last_err: Optional[Exception] = None

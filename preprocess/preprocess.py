@@ -22,6 +22,7 @@ parser.add_argument("-t","--threads", type=int, default=4, help="Input number of
 parser.add_argument("--include_PHI",action='store_true', help='Keep PHI. Includes full length of note (no header-removal), and does not run Philer-UCSF')
 parser.add_argument("--max_chop",action='store_true', help="Reduce the clinical note to just the shortest length possible (likely the impressions or summary section), if present.")
 parser.add_argument("--time_filter",action='store_true', help="Only include records from 2/12/24-2/12/26")
+parser.add_argument("--subset", "-s", required=False, help="path to .csv file with specific note_id's to select for")
 args = parser.parse_args()
 
 
@@ -65,6 +66,14 @@ class EEGNotes:
         self._data = _collapsed
         self._num_notes = self._data.shape[0]
 
+    def subset(self):
+        note_ids = pd.read_csv(args.subset, header=None).squeeze()
+        print(note_ids.shape[0])
+        note_ids = note_ids.astype(str)
+        self._data = self._data.astype(str)
+        self._data = self._data[self._data['note_id'].isin(set(note_ids))]
+
+
     def time_filter(self):
         self._data["spec_time_loc_dttm"] = pd.to_datetime(self._data["spec_time_loc_dttm"])
         self._data = self._data[self._data["spec_time_loc_dttm"].between(pd.Timestamp('2024-02-12'), pd.Timestamp('2026-02-12'))]
@@ -78,6 +87,7 @@ class EEGNotes:
             & ~text.contains("neonatal", case=False, na=False)
             & ~text.contains("nicu", case=False, na=False)
             & ~text.contains("interventional neurophysiology service", case=False, na=False)
+            & ~text.contains("Electronic Analysis and programming of RNS", case=False, na=False)
         )
 
         self._data = self._data[mask].reset_index(drop=True)
@@ -265,9 +275,13 @@ if "line" in notes.get_df().columns:
     notes.collapse_note()
     print("Collapsed detected multi-line notes.")
 
-print(f"Number of ALL records: {notes.get_note_count()}")
-notes.filter_non_eeg()
-print(f"Number of EEG records: {notes.get_note_count()}")
+if args.subset:
+    notes.subset()
+    print('Filtered for inputed subset of note ids.')
+else:
+    print(f"Number of ALL records: {notes.get_note_count()}")
+    notes.filter_non_eeg()
+    print(f"Number of EEG records: {notes.get_note_count()}")
 
 if args.time_filter:
     notes.time_filter()
