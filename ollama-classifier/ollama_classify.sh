@@ -50,7 +50,9 @@ mkdir -p $OLLAMA_MODELS
 echo "Updated Ollama's MODELS directory"
 
 export OLLAMA_CONTEXT_LENGTH=16384
-ollama serve > logs/ollama_serve.log &e
+export OLLAMA_FLASH_ATTENTION=1
+export OLLAMA_KV_CACHE_TYPE=q8_0
+ollama serve &
 OLLAMA_PID=$!
 MAX_WAIT=30
 WAITED=0
@@ -68,11 +70,6 @@ done
 
 echo "Ollama server is ready"
 
-# check/download model
-ollama list | grep -q "$MODEL" || ollama pull "$MODEL"
-
-echo "Found/Downloaded model: $MODEL"
-
 # Manage max threads
 export OMP_NUM_THREADS=8
 
@@ -85,14 +82,7 @@ mkdir -p "$LUSTRE_DIR"
 echo "Running inferencing script"
 
 # ---- Run Python job ----
-python3 -u "$SCRIPT" \
-    --input "$INPUT_FILE" \
-    --output_dir "$LUSTRE_DIR" \
-    --db_path "$LUSTRE_DIR/results.sqlite" \
-    --model "$MODEL" \
-    --limit 100
-
-ollama ps
+python3 main.py
 
 # ---- Copy results to Home ----
 mkdir -p "$HOME/eeg_llm_classification/results"

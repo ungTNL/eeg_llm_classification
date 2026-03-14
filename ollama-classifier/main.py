@@ -1,223 +1,175 @@
-#!/usr/bin/env python3
-"""
-Clinical note classifier (single-file)
-- Uses ollama Python library (no requests)
-- SQLite checkpointing + resume
-- One inference per note (extract multiple feature labels in one JSON)
-- Dynamic feature set (update FEATURES list any time; run_id changes automatically)
-- Outputs ONLY labels (true/false/null). No evidence/confidence.
-
-Example:
-  python ollama_classify_labels_only.py \
-    --input /path/to/EEG_PHI_removed.xlsx \
-    --text_col note_text \
-    --id_col note_id \
-    --model llama3.2 \
-    --output_dir /expanse/lustre/scratch/$USER/temp_project/ollama/results \
-    --db_path /expanse/lustre/scratch/$USER/temp_project/ollama/results/results.sqlite \
-    --prompt_version v1
-
-Notes:
-- Requires an Ollama server reachable via OLLAMA_HOST or default http://127.0.0.1:11434
-- Prior to executing this script, start ollama with "export OLLAMA_CONTEXT_LENGTH=16384 ollama serve &"
-- If your ollama python package errors on format="json", remove that kwarg; prompt still enforces JSON.
-"""
-
-from __future__ import annotations
-
-import argparse
-import json
-import logging
-import time
-from pathlib import Path
-
 import pandas as pd
-import ollama
-
-
-# custom modules
-from call_retry import infer_one_note_with_retries
-from utilities import *
+import instructor
+from openai import AsyncOpenAI
+import asyncio
+import aiosqlite
+import sqlite3
+import time
 from config import *
+from prompting import system_prompt
 
+# 1. Initialize the Async Instructor client
+llm = instructor.from_openai(
+        AsyncOpenAI(
+        base_url="http://localhost:11434/v1",
+        api_key="ollama", # api_key is ignored by Ollama
+    ),
+    mode=instructor.Mode.JSON,
+)
 
-
-# ----------------------------
-# Main
-# ----------------------------
-
-def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--input", "-i", required=True, help="Input spreadsheet (.xlsx/.xls or .csv)")
-    ap.add_argument("--output_dir", "-o", default="results", help="Directory to write outputs")
-    ap.add_argument("--db_path", default="results/results.sqlite", help="SQLite checkpoint DB path (e.g., results.sqlite)")
-    ap.add_argument("--model", required=True, help="Ollama model name (e.g., llama3.2)")
-    ap.add_argument("--prompt_version", default="v1", help="Bump when you change prompts/features behavior")
-    ap.add_argument("--id_col", default="note_id", help="Column name for note IDs")
-    ap.add_argument("--text_col", default="note_text", help="Column name for note text")
-    ap.add_argument("--limit", type=int, default=0, help="Limit number of notes (0 = no limit)")
-    ap.add_argument("--verbosity", "-v", action="count", default=0)
-    ap.add_argument("--max_retries", type=int, default=4)
-    ap.add_argument("--timeout_s", type=int, default=600, help="Per-note wallclock timeout")
-    args = ap.parse_args()
-
-    init_logger(args.verbosity)
-
-    out_dir = Path(args.output_dir)
-    ensure_dir(out_dir)
-
-    db_path = Path(args.db_path)
-    con = connect_sqlite(db_path)
-    create_tables(con)
-
-    # Load input
-    inp = Path(args.input)
-    if not inp.exists():
-        logging.error("Input not found: %s", inp)
-        return 2
-
-    if inp.suffix.lower() in (".xlsx", ".xls"):
-        df = pd.read_excel(inp)
-    elif inp.suffix.lower() == ".csv":
-        df = pd.read_csv(inp)
-    else:
-        logging.error("Unsupported input extension: %s", inp.suffix)
-        return 2
-
-    df.columns = [c.strip() for c in df.columns]
-    if args.id_col not in df.columns or args.text_col not in df.columns:
-        logging.error("Missing required columns. Have: %s", list(df.columns))
-        logging.error("Need id_col=%s and text_col=%s", args.id_col, args.text_col)
-        return 2
-
-    if args.limit and args.limit > 0:
-        df = df.head(args.limit)
-
-    run_id = compute_run_id(args.model, args.prompt_version, FEATURES)
-    feature_keys = [f["key"] for f in FEATURES]
-    logging.info("run_id=%s model=%s prompt_version=%s", run_id, args.model, args.prompt_version)
-
-    completed = get_completed_note_ids(con, run_id)
-    logging.info("Already completed: %d notes for this run_id", len(completed))
-
-    client = ollama.Client()
-
-    total = len(df)
-    done = skipped = errors = 0
-
-    for _, row in df.iterrows():
-        note_id = str(row[args.id_col])
-        note_text = row[args.text_col]
-
-        if note_id in completed:
-            skipped += 1
-            continue
-
-        if pd.isna(note_text) or not str(note_text).strip():
-            errors += 1
-            upsert_result(
-                con=con,
-                run_id=run_id,
-                note_id=note_id,
-                status="error",
-                model=args.model,
-                prompt_version=args.prompt_version,
-                labels_json=None,
-                raw_response=None,
-                error="Empty note text",
-                elapsed_s=None,
+# 3. Database setup function
+async def setup_db():
+    async with aiosqlite.connect(DB_FILE) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS extractions (
+                note_id INTEGER PRIMARY KEY,
+                study_number TEXT,
+                emu_label TEXT,
+                
+                diff_enceph_val BOOLEAN,
+                diff_enceph_text TEXT,
+                diff_enceph_mod TEXT,
+                
+                sz_epileptic_val BOOLEAN,
+                sz_epileptic_text TEXT,
+                sz_non_epileptic_val BOOLEAN,
+                sz_non_epileptic_text TEXT,
+                sz_status_epilepticus_val BOOLEAN,
+                sz_status_epilepticus_text TEXT,
+                sz_ncse_val BOOLEAN,
+                sz_ncse_text TEXT,
+                
+                ed_val BOOLEAN,
+                ed_text TEXT,
+                ed_type TEXT,
+                
+                asym_val BOOLEAN,
+                asym_text TEXT,
+                iic_val BOOLEAN,
+                iic_text TEXT,
+                gpd_val BOOLEAN,
+                gpd_text TEXT,
+                gpdt_val BOOLEAN,
+                gpdt_text TEXT,
+                lpd_val BOOLEAN,
+                lpd_text TEXT,
+                focal_slowing_val BOOLEAN,
+                focal_slowing_text TEXT,
+                
+                inference_time REAL,
+                error TEXT
             )
-            continue
+        """)
+        await db.commit()
 
+# 4. The core extraction worker
+async def process_note(note_id: int, note_text: str, semaphore: asyncio.Semaphore):
+    async with semaphore:
+        async with aiosqlite.connect(DB_FILE) as db:
+            async with db.execute("SELECT 1 FROM extractions WHERE note_id = ?", (note_id,)) as cursor:
+                if await cursor.fetchone():
+                    print(f"Skipping {note_id} - already processed.")
+                    return
+
+        print(f"Processing note {note_id}...")
+        start_time = time.time()
+        
         try:
-            t0 = time.perf_counter()
-            parsed, raw = infer_one_note_with_retries(
-                client=client,
-                model=args.model,
-                note_id=note_id,
-                note_text=str(note_text),
-                features=FEATURES,
-                options=DEFAULT_OPTIONS,
-                max_retries=args.max_retries,
-                base_backoff_s=2.0,
-                wallclock_timeout_s=args.timeout_s,
+            extraction = await llm.chat.completions.create(
+                model="llama3.1", 
+                messages=[
+                    {"role": "system", "content": "Extract the requested fields. Ensure exact quotes are used for evidence text."},
+                    {"role": "user", "content": note_text}
+                ],
+                response_model=EEGExtraction,
+                max_retries=3, 
+                extra_body={"options": {"num_ctx": 8192}} 
             )
-            elapsed_s = time.perf_counter() - t0
-
-            upsert_result(
-                con=con,
-                run_id=run_id,
-                note_id=note_id,
-                status="ok",
-                model=args.model,
-                prompt_version=args.prompt_version,
-                labels_json=json.dumps(parsed.features, ensure_ascii=False),
-                raw_response=raw,
-                error=None,
-                elapsed_s=elapsed_s,
-            )
-            done += 1
-            if done % 50 == 0:
-                logging.info("Progress: done=%d/%d skipped=%d errors=%d", done, total, skipped, errors)
-
+            
+            inference_time = time.time() - start_time
+            
+            # Join the list of Enums into a single string safely
+            ed_types_joined = ", ".join([t.value for t in extraction.epileptiform_discharges_type]) if extraction.epileptiform_discharges_type else ""
+            
+            # Massive Flattened Insertion
+            async with aiosqlite.connect(DB_FILE) as db:
+                await db.execute("""
+                    INSERT INTO extractions (
+                        note_id, study_number, emu_label,
+                        diff_enceph_val, diff_enceph_text, diff_enceph_mod,
+                        sz_epileptic_val, sz_epileptic_text, sz_non_epileptic_val, sz_non_epileptic_text, 
+                        sz_status_epilepticus_val, sz_status_epilepticus_text, sz_ncse_val, sz_ncse_text,
+                        ed_val, ed_text, ed_type,
+                        asym_val, asym_text, iic_val, iic_text, gpd_val, gpd_text,
+                        gpdt_val, gpdt_text, lpd_val, lpd_text, focal_slowing_val, focal_slowing_text,
+                        inference_time
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    note_id, 
+                    extraction.study_number, 
+                    extraction.emu_label.value if extraction.emu_label else None,
+                    
+                    extraction.diffuse_encephalopathy.value,
+                    extraction.diffuse_encephalopathy.text,
+                    extraction.diffuse_encephalopathy_modifier.value if extraction.diffuse_encephalopathy_modifier else None,
+                    
+                    extraction.sz_epileptic.value,
+                    extraction.sz_epileptic.text,
+                    extraction.sz_non_epileptic.value, 
+                    extraction.sz_non_epileptic.text, 
+                    extraction.sz_status_epilepticus.value,
+                    extraction.sz_status_epilepticus.text,
+                    extraction.sz_nonconvulsive_status_epilepticus.value,
+                    extraction.sz_nonconvulsive_status_epilepticus.text,
+                    
+                    extraction.epileptiform_discharges.value,
+                    extraction.epileptiform_discharges.text,
+                    ed_types_joined,
+                    
+                    extraction.asymmetric.value, extraction.asymmetric.text,
+                    extraction.ictal_interictal_cont.value, extraction.ictal_interictal_cont.text,
+                    extraction.gen_pd.value, extraction.gen_pd.text,
+                    extraction.gen_pdt.value, extraction.gen_pdt.text,
+                    extraction.lat_pd.value, extraction.lat_pd.text,
+                    extraction.focal_slowing.value, extraction.focal_slowing.text,
+                    
+                    inference_time
+                ))
+                await db.commit()
+                
         except Exception as e:
-            errors += 1
-            elapsed_s = time.perf_counter() - t0
-            logging.error("Failed note_id=%s: %s", note_id, repr(e))
-            upsert_result(
-                con=con,
-                run_id=run_id,
-                note_id=note_id,
-                status="error",
-                model=args.model,
-                prompt_version=args.prompt_version,
-                labels_json=None,
-                raw_response=None,
-                error=repr(e),
-                elapsed_s=elapsed_s,
-            )
+            inference_time = time.time() - start_time
+            print(f"Error on {note_id}: {e}")
+            
+            async with aiosqlite.connect(DB_FILE) as db:
+                await db.execute("INSERT INTO extractions (note_id, error, inference_time) VALUES (?, ?, ?)", 
+                                 (note_id, str(e), inference_time))
+                await db.commit()
 
-    # Export OK results for this run_id
-    rows = con.execute(
-        "SELECT note_id, labels_json, elapsed_s FROM results WHERE run_id=? AND status='ok' ORDER BY note_id;",
-        (run_id,),
-    ).fetchall()
-
-    df_out = flatten_labels(run_id, rows, feature_keys)
-
-    xlsx_path = out_dir / f"ollama_labels_{run_id}.xlsx"
-    df_out.to_excel(xlsx_path, index=False)
-    logging.info("Wrote: %s", xlsx_path)
-
-    # Optional parquet
-    parquet_path = out_dir / f"ollama_labels_{run_id}.parquet"
-    try:
-        df_out.to_parquet(parquet_path, index=False)
-        logging.info("Wrote: %s", parquet_path)
-    except Exception as e:
-        logging.info("Parquet export skipped (missing pyarrow/fastparquet?): %s", repr(e))
-
-    # Metadata
-    meta_path = out_dir / f"run_meta_{run_id}.json"
-    meta = {
-        "run_id": run_id,
-        "model": args.model,
-        "prompt_version": args.prompt_version,
-        "features": FEATURES,
-        "options": DEFAULT_OPTIONS,
-        "db_path": str(db_path),
-        "input": str(inp),
-        "export_xlsx": str(xlsx_path),
-        "export_parquet": str(parquet_path),
-        "finished_at_utc": utc_now_iso(),
-        "counts": {"total_rows": total, "new_ok": done, "skipped_ok": skipped, "errors": errors},
-    }
-    meta_path.write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
-    logging.info("Wrote: %s", meta_path)
-
-    con.close()
-    return 0
-
+# 5. The Batch Manager
+async def main():
+    await setup_db()
+    
+    df = pd.read_excel(INPUT_FILE)
+    if NUM_TEST:
+        df = df.head(NUM_TEST)
+    semaphore = asyncio.Semaphore(CONCURRENCY_LIMIT)
+    tasks = [process_note(row['note_id'], row['note_text'], semaphore) for index, row in df.iterrows()]
+    
+    await asyncio.gather(*tasks)
+    print("All inferences processed!")
+    
+    # Export to Excel
+    print("Exporting merged results to Excel...")
+    conn = sqlite3.connect(DB_FILE)
+    results_df = pd.read_sql_query("SELECT * FROM extractions", conn)
+    results_df['note_id'] = results_df['note_id'].astype(int)
+    conn.close()
+    
+    merged_df = pd.merge(df, results_df, on="note_id", how="left")
+    merged_df.to_excel(OUTPUT_FILE, index=False)
+    print("Export complete! Saved as 'eeg_results_merged.xlsx'.")
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    asyncio.run(main())
