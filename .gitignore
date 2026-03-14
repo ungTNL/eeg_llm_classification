@@ -15,6 +15,7 @@ ollama-classifier/results/*
 *.xlsx
 *.xlsx.csv
 *.csv
+*.db
 
 # Repos, models
 preprocess/philter-ucsf
